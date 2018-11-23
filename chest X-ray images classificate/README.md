@@ -1,0 +1,1 @@
+# This project is used to detect 14 kinds of diseases from chest X-ray images.
