@@ -1,5 +1,5 @@
 import keras
-from read_tfrecord import read_and_decode
+from read_tfrecord import read_and_decode, imgs_input_fn
 from keras.optimizers import Adam
 from keras.applications.resnet50 import ResNet50
 from keras.layers.core import Flatten
@@ -16,7 +16,7 @@ IM_HEIGHT = 224
 
 def ResNet50_model(nb_classes=15, img_rows=224, img_cols=224, RGB=False, is_plot_model=False):
     color = 3 if RGB else 1
-    base_model = ResNet50(weights='.//resnet50_weights_tf_dim_ordering_tf_kernels_notop.h5',
+    base_model = ResNet50(weights=None,
                           include_top=False, pooling=None, input_shape=(img_rows, img_cols, color),
                           classes=nb_classes)
 
@@ -102,9 +102,6 @@ def train():
 
 
 if __name__ == '__main__':
-    test_path = 'data_set' + str(11) + '.tfrecords'
-    x_test, y_test = read_and_decode(test_path)
-    print(x_test.shape[0], 'test samples')
 
     model = ResNet50_model()
     # Let's train the model using RMSprop
@@ -117,9 +114,10 @@ if __name__ == '__main__':
         for y in range(11):
 
             train_path = 'data_set' + str(y) + '.tfrecords'
+            print(train_path)
 
             # 训练：
-            x_train, y_train = read_and_decode(train_path)
+            x_train, y_train = imgs_input_fn(train_path)
 
             print('x_train shape:', x_train.shape)
             print(x_train.shape[0], 'train samples')
@@ -131,7 +129,11 @@ if __name__ == '__main__':
                       # validation_data=(x_test, y_test),
                       verbose=1)
 
-        scores = model.evaluate(x_test, y_test, verbose=0)
+        test_path = 'data_set' + str(11) + '.tfrecords'
+        x_test, y_test = imgs_input_fn(test_path)
+        print(x_test.shape[0], 'test samples')
+
+        scores = model.evaluate(x_test, y_test, verbose=1)
         print('epoch', i)
         print('Test loss:', scores[0])
         print('Test accuracy:', scores[1])
