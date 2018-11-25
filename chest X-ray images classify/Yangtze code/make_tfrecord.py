@@ -33,7 +33,7 @@ def image_2_tfrecords(listname, tf_record_path):
         if os.path.isfile(image_path):
             image = Image.open(image_path)
             image = image.resize((224, 224))
-            print(image.getbands())
+            image = image.convert('L')
             image = image.tobytes()
             labels = int_2_one_hot(items[1])
             if i % 2000 == 0:
@@ -50,7 +50,7 @@ def image_2_tfrecords(listname, tf_record_path):
     tf_write.close()
 
 
-for y in range(1):
+for y in range(12):
 
     train_list = []
 

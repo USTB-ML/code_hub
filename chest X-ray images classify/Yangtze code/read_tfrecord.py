@@ -8,9 +8,27 @@ batch_size = 32
 num_classes = 15
 epochs = 5
 num_predictions = 3
-input_shape = (224, 224, 3)
+input_shape = (224, 224, 1)
 train_samples = 6000
 val_samples = 6000
+
+
+def read_and_decode(filename):
+    filename_queue = tf.train.string_input_producer([filename])  # 生成一个queue队列
+
+    reader = tf.TFRecordReader()
+    _, serialized_example = reader.read(filename_queue)  # 返回文件名和文件
+    features = tf.parse_single_example(serialized_example,
+                                       features={
+                                            'raw_image': tf.FixedLenFeature([], tf.string),
+                                            'label': tf.FixedLenFeature([], tf.int64)
+                                       })  # 将image数据和label取出来
+
+    img = tf.decode_raw(features['raw_image'], tf.uint8)
+    img = tf.reshape(img, [224, 224, 1])  # reshape为128*128的1通道图片
+    img = tf.cast(img, tf.float32) * (1. / 255) - 0.5  # 在流中抛出img张量
+    label = tf.cast(features['label'], tf.int32)  # 在流中抛出label张量
+    return img, label
 
 
 def imgs_input_fn(filenames, perform_shuffle=False, Repeats=epochs, Batchs=6000, Run=True):
@@ -24,7 +42,7 @@ def imgs_input_fn(filenames, perform_shuffle=False, Repeats=epochs, Batchs=6000,
         parsed_example = tf.parse_single_example(serialized=serialized,
                                                  features=features)
         # Get the image as raw bytes.
-        image_shape = tf.stack([224, 224, 3])
+        image_shape = tf.stack([224, 224, 1])
         image_raw = parsed_example['raw_image']
         label = tf.cast(parsed_example['label'], tf.int32)
         # label = tf.one_hot(label, num_classes)
