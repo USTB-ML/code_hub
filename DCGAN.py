@@ -2,6 +2,7 @@
 我在输出png的时候放大了一下尺寸，要不32*32太小了看不清
 需要原图的话请把image_size改成32
 另外，大概500次能出马影，5000次以上基本成型
+据说BN层巨有用，然而实验时真没看出有啥用……除了能让我训练调参更麻烦一些
 '''
 import keras
 from keras import layers
@@ -24,32 +25,32 @@ def wasserstein(y_true, y_pred):  # 以后升级WGAN用
 
 
 def Conv_Down(x, kernel_size, channel, name='Conv_Down?_'):
-    x = layers.Conv2D(channel, kernel_size, strides=2, padding='same', name=name+'Conv',
-                      kernel_initializer=keras.initializers.RandomNormal(stddev=0.02))(x)
-    # x = layers.BatchNormalization(axis=-1, name=name+'BN')(x)
-    x = layers.LeakyReLU(0.2, name=name+'LeakyReLU')(x)
+    # x = layers.BatchNormalization(axis=-1, name=name + 'BN')(x)
+    x = layers.Conv2D(channel, kernel_size, strides=2, padding='same', name=name+'Conv1',)(x)
+    x = layers.LeakyReLU(0.2, name=name+'LeakyReLU1')(x)
+    # x = layers.Dropout(0.2)(x)
+    # x = layers.Conv2D(channel, kernel_size, padding='same', name=name + 'Conv2',
+    #                   kernel_initializer=keras.initializers.RandomNormal(stddev=0.02))(x)
+    # x = layers.LeakyReLU(0.2, name=name + 'LeakyReLU2')(x)
     return x
 
 
 def Conv_Up(x, kernel_size, channel, name='Conv_Down?_'):
-    x = layers.Conv2DTranspose(channel, kernel_size, strides=2, padding='same', name=name+'ConvT',
-                               kernel_initializer=keras.initializers.RandomNormal(stddev=0.02))(x)
+    x = layers.Conv2DTranspose(channel, kernel_size, strides=2, padding='same', name=name+'ConvT',)(x)
     x = layers.LeakyReLU(0.2, name=name + 'LeakyReLU1')(x)
-    x = layers.Conv2D(channel, kernel_size, padding='same', name=name + 'Conv',
-                      kernel_initializer=keras.initializers.RandomNormal(stddev=0.02))(x)
-    # x = layers.BatchNormalization(axis=-1, name=name + 'BN')(x)
-    x = layers.LeakyReLU(0.2, name=name + 'LeakyReLU2')(x)
     return x
 
 
 def G_net():
     generator_input = keras.Input(shape=(latent_dim,), name='G_input')
-    x = layers.Dense(1024 * 4 * 4, name='G_First_Dense')(generator_input)
+    x = layers.Dense(512 * 4 * 4, name='G_First_Dense')(generator_input)
     x = layers.LeakyReLU()(x)
-    x = layers.Reshape((4, 4, 1024))(x)
-    x = Conv_Up(x, kernel_size=3, channel=512, name='Conv_Up1_')
-    x = Conv_Up(x, kernel_size=3, channel=256, name='Conv_Up2_')
-    x = Conv_Up(x, kernel_size=3, channel=128, name='Conv_Up3_')
+    x = layers.Reshape((4, 4, 512))(x)
+    x = Conv_Up(x, kernel_size=5, channel=256, name='Conv_Up1_')
+    x = layers.BatchNormalization(name='BN1')(x)
+    x = Conv_Up(x, kernel_size=5, channel=128, name='Conv_Up2_')
+    x = layers.BatchNormalization(name='BN2')(x)
+    x = Conv_Up(x, kernel_size=5, channel=64, name='Conv_Up3_')
     x = layers.Conv2D(channels, 3, activation='tanh', padding='same', name='G_output')(x)    # 输出层
     generator = keras.models.Model(generator_input, x, name='G')
     generator.summary()
@@ -58,19 +59,21 @@ def G_net():
 
 def D_net():
     discriminator_input = layers.Input(shape=(height, width, channels), name='D_input')
-    x = layers.Conv2D(64, 3, padding='same', name='D_First_Conv')(discriminator_input)
-    # x = layers.BatchNormalization(name='D_First_BN')(x)
-    x = layers.LeakyReLU()(x)
-    x = Conv_Down(x, kernel_size=3, channel=128, name='Conv_Down1_')
-    x = Conv_Down(x, kernel_size=3, channel=256, name='Conv_Down2_')
-    x = Conv_Down(x, kernel_size=3, channel=512, name='Conv_Down3_')
+    # x = layers.Conv2D(64, 3, padding='same', name='D_First_Conv')(discriminator_input)
+    # # x = layers.BatchNormalization(name='D_First_BN')(x)
+    # x = layers.LeakyReLU()(x)
+    x = Conv_Down(discriminator_input, kernel_size=5, channel=128, name='Conv_Down1_')
+    x = layers.Dropout(0.2)(x)
+    x = Conv_Down(x, kernel_size=5, channel=256, name='Conv_Down2_')
+    x = layers.Dropout(0.2)(x)
+    x = Conv_Down(x, kernel_size=5, channel=512, name='Conv_Down3_')
     x = layers.Flatten()(x)
-    x = layers.Dropout(0.4)(x)  # 这个技巧很关键！
+    x = layers.Dropout(0.4)(x)
     x = layers.Dense(1, activation='sigmoid', name='D_output')(x)
     discriminator = keras.models.Model(discriminator_input, x, name='D')
     discriminator.summary()
     discriminator_optimizer = keras.optimizers.RMSprop(
-        lr=0.0008,
+        lr=0.0004,
         clipvalue=1.0,
         decay=1e-8)
     # discriminator_optimizer = keras.optimizers.Adam(lr=0.0002, beta_1=0.5)
